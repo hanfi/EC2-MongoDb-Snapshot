@@ -86,7 +86,7 @@ command -v aws >/dev/null 2>&1 || { echo >&2 "AWSCLI is not installed !!! begin 
 mongo admin --eval "var databaseNames = db.getMongo().getDBNames(); for (var i in databaseNames) { printjson(db.getSiblingDB(databaseNames[i]).getCollectionNames()) }; printjson(db.fsyncLock());"
 
 # Create Snapshot description
-if [$DESCRIPTION == ""];then
+if [ $DESCRIPTION = "" ];then
 
 	DATE=$(date -u "+%F-%H%M%S")
 	DESCRIPTION="backup-$DATE"
