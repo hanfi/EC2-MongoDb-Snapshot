@@ -99,11 +99,15 @@ fi
 
 echo "$CRED_SOURCE Credentials will be used to perfom AWS actions"
 
+#Get the instance region 
+REGION="`echo \"$(ec2metadata --availability-zone)\" | sed -e 's:\([0-9][0-9]*\)[a-z]*\$:\\1:'`"
+
+
 #Create the Config file to use if needed
 case $CRED_SOURCE in
   "CMD_PARAMS")
-    AWS_ACCESS_KEY_ID=ACCESS_KEY_ID
-    AWS_SECRET_ACCESS_KEY=SECRET_ACCESS_KEY
+    AWS_ACCESS_KEY_ID=$ACCESS_KEY_ID
+    AWS_SECRET_ACCESS_KEY=$SECRET_ACCESS_KEY
     CONF_CREATED="true"
     ;;
   "ENV_VAR")
@@ -116,14 +120,13 @@ case $CRED_SOURCE in
     ;;
 esac
 
-if [[ CONF_CREATED = "true" ]]; then
+if [[ "$CONF_CREATED" = "true" ]]; then
 
   echo "Creation of ~/.aws/config"
 
   : ${AWS_ACCESS_KEY_ID:?"\$AWS_ACCESS_KEY_ID must be set in ~/.aws/config, as Environment Variable Or as command Param -k"}
   : ${AWS_SECRET_ACCESS_KEY:?"\$AWS_SECRET_ACCESS_KEY must be set in ~/.aws/config, as Environment Variable Or as command Param -s"}
-  : ${REGION:?"\$REGION must be set in ~/.aws/config, as Environment Variable Or as command Param -r"}
-
+  
   mkdir ~/.aws/
 
   echo "[default]
@@ -134,52 +137,48 @@ if [[ CONF_CREATED = "true" ]]; then
 fi
 
 
-echo $CONF_CREATED
-# #Check if Mongo is in PATH
-# command -v mongo >/dev/null 2>&1 || { echo >&2 "I require mongo but it's not installed or not in PATH.  Aborting."; exit 1; }
+#Check if Mongo is in PATH
+command -v mongo >/dev/null 2>&1 || { echo >&2 "I require mongo but it's not installed or not in PATH.  Aborting."; exit 1; }
 
-# #install pip and aws-cli if not present 
-# command -v pip >/dev/null 2>&1 || { echo >&2 "pip is not installed !!! begin PIP install"; sudo apt-get install python-pip -y;}
-# command -v aws >/dev/null 2>&1 || { echo >&2 "AWSCLI is not installed !!! begin AWSCLI install"; sudo pip install awscli;}
-
+#install pip and aws-cli if not present 
+command -v pip >/dev/null 2>&1 || { echo >&2 "pip is not installed !!! begin PIP install"; sudo apt-get install python-pip -y;}
+command -v aws >/dev/null 2>&1 || { echo >&2 "AWSCLI is not installed !!! begin AWSCLI install"; sudo pip install awscli;}
 
 
-# # Create Snapshot description
-# if [ "$DESCRIPTION" = "" ];then
+# Create Snapshot description if specified
+if [ "$DESCRIPTION" = "" ];then
 
-# 	DATE=$(date -u "+%F-%H%M%S")
-# 	DESCRIPTION="backup-$DATE"
-# fi
-
-# CONF_CREATED="false"
+	DATE=$(date -u "+%F-%H%M%S")
+	DESCRIPTION="backup-$DATE"
+fi
 
 
-# #Lock the database
-# mongo admin --eval "var databaseNames = db.getMongo().getDBNames(); for (var i in databaseNames) { printjson(db.getSiblingDB(databaseNames[i]).getCollectionNames()) }; printjson(db.fsyncLock());"
+#Lock the database
+mongo admin --eval "var databaseNames = db.getMongo().getDBNames(); for (var i in databaseNames) { printjson(db.getSiblingDB(databaseNames[i]).getCollectionNames()) }; printjson(db.fsyncLock());"
 
-# # DO backup
-# SNAP_ID=$(aws ec2 create-snapshot --volume-id $(aws ec2 describe-volumes --filters Name=attachment.instance-id,Values=$(ec2metadata --instance-id) --query Volumes[*].VolumeId --output=text) --description "$DESCRIPTION" --query SnapshotId --output=text)
+# DO backup
+SNAP_ID=$(aws ec2 create-snapshot  --region $REGION --volume-id $(aws ec2 describe-volumes  --region $REGION --filters Name=attachment.instance-id,Values=$(ec2metadata --instance-id) --query Volumes[*].VolumeId --output=text) --description "$DESCRIPTION" --query SnapshotId --output=text)
 
-# #info
-# echo "Snapshot_id = $SNAP_ID
-# Description = $DESCRIPTION"
+#info
+echo "Snapshot_id = $SNAP_ID
+Description = $DESCRIPTION"
 
 
-# #wait for the snapshot to complete
-# while [ $(aws ec2 describe-snapshots --snapshot-ids $SNAP_ID --query Snapshots[*].State --output=text) != "completed" ]
-# do
-# 	echo "wating for snapshot $SNAP_ID to complete ..."
-# 	sleep 5
-# done
+#wait for the snapshot to complete
+while [ $(aws ec2 describe-snapshots --region $REGION --snapshot-ids $SNAP_ID --query Snapshots[*].State --output=text) != "completed" ]
+do
+	echo "wating for snapshot $SNAP_ID to complete ..."
+	sleep 5
+done
 
-# echo "snapshot $SNAP_ID completed !!!"
+echo "snapshot $SNAP_ID completed !!!"
 
-# # Unlock the database
-# mongo admin --eval "printjson(db.fsyncUnlock());"
+# Unlock the database
+mongo admin --eval "printjson(db.fsyncUnlock());"
 
-# #Delete the configuration file if it was created buy the script
-# if [ "$CONF_CREATED" = "true" ]; then
+#Delete the configuration file if it was created buy the script
+if [ "$CONF_CREATED" = "true" ]; then
 
-# 	sudo rm -rf ~/.aws/config
+	sudo rm -rf ~/.aws/config
 
-# fi 
+fi 
