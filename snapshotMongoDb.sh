@@ -7,7 +7,7 @@ usage: $0 options
 
 This script stops the mongo databases from writing, and creates a EBS snapshot. to assure the integrity.
 
-This is an example of the AMI User policy:
+This is an example of the AMI User policy to use:
 {
   "Version": "2012-10-17",
   "Statement": [
@@ -82,11 +82,9 @@ command -v pip >/dev/null 2>&1 || { echo >&2 "pip is not installed !!! begin PIP
 command -v aws >/dev/null 2>&1 || { echo >&2 "AWSCLI is not installed !!! begin AWSCLI install"; sudo pip install awscli;}
 
 
-#Lock the database
-mongo admin --eval "var databaseNames = db.getMongo().getDBNames(); for (var i in databaseNames) { printjson(db.getSiblingDB(databaseNames[i]).getCollectionNames()) }; printjson(db.fsyncLock());"
 
 # Create Snapshot description
-if [ $DESCRIPTION = "" ];then
+if [ "$DESCRIPTION" = "" ];then
 
 	DATE=$(date -u "+%F-%H%M%S")
 	DESCRIPTION="backup-$DATE"
@@ -96,6 +94,10 @@ CONF_CREATED="false"
 
 #verify if config already exists ToDo better use AWS-ec2-role
 if [ ! -f ~/.aws/config ]; then
+
+: ${AWS_ACCESS_KEY_ID:?"\$AWS_ACCESS_KEY_ID must be set in ~/.aws/config, as Environment Variable Or as command Param -k"}
+: ${AWS_SECRET_ACCESS_KEY:?"\$AWS_SECRET_ACCESS_KEY must be set in ~/.aws/config, as Environment Variable Or as command Param -s"}
+: ${REGION:?"\$REGION must be set in ~/.aws/config, as Environment Variable Or as command Param -r"}
 
 mkdir ~/.aws/
 
@@ -109,6 +111,8 @@ CONF_CREATED="true"
 
 fi
 
+#Lock the database
+mongo admin --eval "var databaseNames = db.getMongo().getDBNames(); for (var i in databaseNames) { printjson(db.getSiblingDB(databaseNames[i]).getCollectionNames()) }; printjson(db.fsyncLock());"
 
 # DO backup
 SNAP_ID=$(aws ec2 create-snapshot --volume-id $(aws ec2 describe-volumes --filters Name=attachment.instance-id,Values=$(ec2metadata --instance-id) --query Volumes[*].VolumeId --output=text) --description "$DESCRIPTION" --query SnapshotId --output=text)
@@ -131,7 +135,7 @@ echo "snapshot $SNAP_ID completed !!!"
 mongo admin --eval "printjson(db.fsyncUnlock());"
 
 #Delete the configuration file if it was created buy the script
-if [ $CONF_CREATED = "true" ]; then
+if [ "$CONF_CREATED" = "true" ]; then
 
 	sudo rm -rf ~/.aws/config
 
