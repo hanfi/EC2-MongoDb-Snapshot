@@ -32,6 +32,9 @@ Credentials can be set as Environment Variables :
 	$ export AWS_SECRET_ACCESS_KEY=YourSecretKey
 	$ export AWS_DEFAULT_REGION=us-west-1
 
+
+Or use ~/.aws/config file, the default account will b used.
+
 OPTIONS:
    -h      Show this message
    -k      AWS Access Key
