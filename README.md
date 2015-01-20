@@ -7,3 +7,12 @@ Steps:
 * blocks writing on the mongoDb
 * snapshot the EC2 instance volume attached
 * unlock the writing to mongoDb
+
+Usage:
+------
+
+for all infos
+
+```shell
+./snapshotMongoDb.sh -h
+```
